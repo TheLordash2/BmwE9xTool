@@ -28,7 +28,7 @@ public sealed class MainActivity : Activity
     private EdiabasSession _session = null!;
     private VehicleIdentityService _identity = null!;
     private FaService _faService = null!;
-    private FaultService _faults = null!;
+    private FaultService _faults = null!;\n    private NcsSgfamParser _sgfam = null!;
     private BackupService _backups = null!;
     private FaWriteEngine _writer = null!;
     private UsbPermissionReceiver? _usbReceiver;
@@ -128,7 +128,8 @@ public sealed class MainActivity : Activity
         AddSection(root, "Vehicle");
         _readVin = AddButton(root, "Read VIN from car", async () => await ReadVinAsync());
         _readFa = AddButton(root, "Read FA/VO", async () => await ReadFaAsync());
-        _scanFaults = AddButton(root, "Scan fault memories", async () => await ScanFaultsAsync());
+        _scanFaults = AddButton(root, "Scan common fault memories", async () => await ScanFaultsAsync(false));
+        AddButton(root, "Deep fault scan (all imported E89 SGFAM modules)", async () => await ScanFaultsAsync(true));
 
         AddSection(root, "Option editor");
         _optionInput = new EditText(this)
