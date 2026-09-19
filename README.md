@@ -1,37 +1,68 @@
 # BmwE9xTool
 
-Experimental Android diagnostic/coding tool for BMW E8x/E9x vehicles using a USB K+DCAN/FTDI interface.
+Android diagnostic and FA/VO utility for BMW E8x/E9x vehicles using a USB K+DCAN/FTDI adapter and the open-source EdiabasLib transport.
 
-## Current milestone: v0.1 read-only
+## Current scope
 
-The first milestone intentionally performs **no ECU writes**.
+The active app is the .NET Android project under `src/BmwE9xTool.Android`.
 
-Goals:
-- Detect USB diagnostic adapters on Android
-- Request USB permission
-- Show VID/PID and descriptors
-- Establish a clean transport abstraction for BMW K-Line/D-CAN
-- Read CAS VIN once the EDIABAS transport is integrated
-- Keep detailed session logs
+Implemented:
 
-Development vehicle configuration:
-- VIN is configured locally at runtime and is never committed
-- Platform family: BMW E8x/E9x / E89 daten family
+- USB host access for FTDI/K+DCAN adapters
+- EDIABAS initialization through EdiabasLib
+- VIN read from E9x identity modules
+- FA/VO read from CAS and other available FA holders
+- comparison of multiple stored FA copies
+- display of current SA option codes
+- generic add/remove staging for SA codes such as `$6FL`
+- common E90 fault-memory scan using `FS_LESEN`
+- automatic private backup before writes
+- battery-voltage, VIN-match and explicit-user write gates
+- experimental CAS/FRM FA write using `FA_STREAM_FOR_ECU` + `C_FA_AUFTRAG`
+- immediate FA read-back verification after every write target
+- GitHub Actions Android build with APK artifact upload
 
-## Planned milestones
-1. v0.1 USB adapter detection + read-only connection shell
-2. v0.2 CAS identification + VIN read
-3. v0.3 ECU discovery + fault-memory scan
-4. v0.4 Read FA/VO from CAS and FRM/NFRM and compare
-5. v0.5 Decode and display SA option codes
-6. v0.6 Safe in-memory VO editing with automatic backups
-7. v0.7 Verified CAS/FRM FA writes
-8. v0.8 RAD2 coding support
-9. v1.0 Guided retrofit workflows
+## Privacy
 
-## Safety model
-- Read-only by default
-- No CAS/FRM/RAD2 write support until read/backup/verify paths are proven
-- VIN-gated future write operations
-- Read-back verification after every future write
-- No blind automatic retries
+No vehicle VIN is committed to this repository. The expected VIN is entered locally at runtime. The app does not log that configured expected VIN. VIN and FA backups created by the app remain in Android app-private storage unless the user deliberately exports them.
+
+## Data files
+
+BMW EDIABAS/SP-Daten files are not distributed in this repository. In the app, choose **Import ECU / SP-Daten ZIP** and provide files you are licensed to use. The importer accepts the relevant `.PRG`, `.GRP`, NCS/DATEN and related files.
+
+At minimum, E9x diagnosis requires the appropriate ECU group/variant PRG files, including the CAS group data. FA conversion also requires `FA.PRG`.
+
+## Typical workflow
+
+1. Import compatible ECU/SP-Daten files.
+2. Attach the USB K+DCAN adapter using USB OTG.
+3. Grant Android USB permission.
+4. Initialize EDIABAS.
+5. Enter the expected VIN locally.
+6. Read the VIN from the car and confirm the safety match.
+7. Read FA/VO copies.
+8. Scan faults if desired.
+9. Stage an SA-code addition or removal.
+10. Create a backup.
+11. Only if intentionally testing the write path: arm write mode and accept the experimental FA-write acknowledgement.
+12. Write. The app verifies each written FA by reading it back.
+
+## Important limitation
+
+Changing the FA/VO tells the vehicle what equipment is installed. It does **not yet reproduce NCS Expert's full `SG_CODIEREN`/DATEN coding-data generation** for an arbitrary ECU. For the Professional Radio retrofit, the remaining later milestone is default-coding the RAD2 from the updated VO or implementing the required RAD2 parameter coding.
+
+The FA writer remains labelled experimental until validated on physical E9x hardware.
+
+## Build
+
+The repository includes a GitHub Actions workflow. A successful workflow run uploads the generated APK as the `BmwE9xTool-android` artifact.
+
+Local build:
+
+```bash
+bash scripts/bootstrap-ediabas.sh
+dotnet workload install android
+dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release
+```
+
+EdiabasLib is pinned by the bootstrap script to a known source revision to keep builds reproducible.
