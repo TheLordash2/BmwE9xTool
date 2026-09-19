@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../src/BmwE9xTool.Android/Vehicle/Models.cs" Link="Vehicle/Models.cs" />
+    <Compile Include="../../src/BmwE9xTool.Android/Coding/OptionCatalog.cs" Link="Coding/OptionCatalog.cs" />
+    <Compile Include="../../src/BmwE9xTool.Android/Coding/FaEditor.cs" Link="Coding/FaEditor.cs" />
+  </ItemGroup>
+</Project>
