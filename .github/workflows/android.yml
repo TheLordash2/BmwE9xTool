@@ -17,6 +17,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Privacy scan
+        run: bash scripts/privacy-check.sh
+
+      - name: Core smoke tests
+        run: dotnet run --project tests/BmwE9xTool.SmokeTests/BmwE9xTool.SmokeTests.csproj -c Release
+
       - name: Install Android workload
         run: dotnet workload install android
 
