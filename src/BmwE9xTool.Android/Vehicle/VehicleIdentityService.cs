@@ -35,7 +35,7 @@ public sealed class VehicleIdentityService
                     var vin = set.String(candidate.Result)?.Trim();
                     if (!string.IsNullOrEmpty(vin) && vin.Length >= 7)
                     {
-                        _log.Add($"VIN read through {candidate.Sgbd}: {vin}");
+                        _log.Add($"VIN read successfully through {candidate.Sgbd} (value intentionally not logged).");
                         return vin;
                     }
                 }
