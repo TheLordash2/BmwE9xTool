@@ -12,6 +12,7 @@
     <AndroidPackageFormats>apk</AndroidPackageFormats>
     <AndroidEnableMultiDex>true</AndroidEnableMultiDex>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
