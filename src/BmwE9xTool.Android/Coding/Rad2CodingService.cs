@@ -93,6 +93,31 @@ public sealed class Rad2CodingService
         return states;
     }
 
+    public async Task<Rad2ParameterState> ReadStateAsync(
+        Rad2Target target,
+        string functionName,
+        CancellationToken ct = default)
+    {
+        var function = target.Cabd.Function(functionName)
+            ?? throw new InvalidOperationException($"CABD does not contain FSW {functionName}.");
+
+        var netto = await ReadCodingAsync(target, ct);
+        var current = DecodeParameter(function, netto);
+
+        return new Rad2ParameterState(
+            function.Keyword,
+            current?.Keyword,
+            function.Parameters.Select(x => x.Keyword).ToList());
+    }
+
+    public IReadOnlyList<string> ListFunctions(Rad2Target target) =>
+        target.Cabd.Functions
+            .Where(x => !string.IsNullOrWhiteSpace(x.Keyword))
+            .Select(x => x.Keyword)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     public async Task<string> SetParameterAsync(
         Rad2Target target,
         string functionName,
