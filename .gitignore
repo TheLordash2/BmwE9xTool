@@ -5,3 +5,7 @@
 /build/
 app/build/
 .DS_Store
+
+# Local proprietary BMW starter-data staging; never commit.
+starter-data/e9x/**
+!starter-data/e9x/README.md
