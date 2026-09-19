@@ -24,4 +24,17 @@
                       AdditionalProperties="EnableAndroidTargets=true" />
     <ProjectReference Include="../../vendor/ediabaslib/EdiabasLib/AndroidNetBindings/UsbSerialNetBinding/UsbSerialNetBinding.csproj" />
   </ItemGroup>
+
+  <!--
+    Optional local starter-data embedding.
+    Point E9xStarterDataDir at a locally prepared folder containing:
+      ecu/
+      ncs/daten/
+      ncs/sgdat/
+    The data itself is intentionally not committed to the public repository.
+  -->
+  <ItemGroup Condition="'$(E9xStarterDataDir)' != '' and Exists('$(E9xStarterDataDir)')">
+    <AndroidAsset Include="$(E9xStarterDataDir)/**/*"
+                  Link="e9x-starter/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
