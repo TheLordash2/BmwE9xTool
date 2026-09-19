@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android36.1</TargetFramework>
+    <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationId>com.thelordash2.bmwe9xtool</ApplicationId>
+    <ApplicationTitle>BMW E9x Tool</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../vendor/ediabaslib/EdiabasLib/EdiabasLib/EdiabasLib.csproj"
+                      AdditionalProperties="EnableAndroidTargets=true" />
+    <ProjectReference Include="../../vendor/ediabaslib/EdiabasLib/AndroidNetBindings/UsbSerialNetBinding/UsbSerialNetBinding.csproj" />
+  </ItemGroup>
+</Project>

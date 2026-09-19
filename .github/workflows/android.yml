@@ -1,0 +1,21 @@
+name: Android build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install Android workload
+        run: dotnet workload install android
+      - name: Bootstrap EdiabasLib
+        run: bash scripts/bootstrap-ediabas.sh
+      - name: Build
+        run: dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release
