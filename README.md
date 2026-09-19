@@ -1,68 +1,139 @@
 # BmwE9xTool
 
-Android diagnostic and FA/VO utility for BMW E8x/E9x vehicles using a USB K+DCAN/FTDI adapter and the open-source EdiabasLib transport.
+Android diagnostic, FA/VO and classic NCS-style coding utility for BMW E8x/E9x vehicles using a USB K+DCAN/FTDI adapter and the open-source EdiabasLib transport.
 
-## Current scope
+The app is intentionally data-driven. BMW EDIABAS/SP-Daten files are imported by the user at runtime and are **not** distributed in this repository.
 
-The active app is the .NET Android project under `src/BmwE9xTool.Android`.
+## Implemented
 
-Implemented:
+### Connection / diagnostics
 
-- USB host access for FTDI/K+DCAN adapters
+- Android USB host support for FTDI/K+DCAN adapters
 - EDIABAS initialization through EdiabasLib
-- VIN read from E9x identity modules
-- FA/VO read from CAS and other available FA holders
-- comparison of multiple stored FA copies
-- display of current SA option codes
+- vehicle VIN read from E-series identity modules
+- common E90/E9x fault-memory scan with `FS_LESEN`
+- deep fault scan driven by imported `E89SGFAM.DAT`
+- session logging without hard-coded vehicle identifiers
+
+### FA / VO
+
+- read FA/VO from CAS and other FA holders discovered from E89 SGFAM data
+- compare redundant stored FA copies
+- display current SA option codes and descriptions
 - generic add/remove staging for SA codes such as `$6FL`
-- common E90 fault-memory scan using `FS_LESEN`
-- automatic private backup before writes
-- battery-voltage, VIN-match and explicit-user write gates
-- experimental CAS/FRM FA write using `FA_STREAM_FOR_ECU` + `C_FA_AUFTRAG`
-- immediate FA read-back verification after every write target
-- GitHub Actions Android build with APK artifact upload
+- preserve non-SA FA tokens while editing
+- convert edited FA with `FA.PRG / FA_STREAM_FOR_ECU`
+- write supported FA holders with `C_FA_AUFTRAG`
+- write redundant holders before CAS
+- immediate read-back and normalized FA comparison after every write
 
-## Privacy
+### NCS/DATEN parsing
 
-No vehicle VIN is committed to this repository. The expected VIN is entered locally at runtime. The app does not log that configured expected VIN. VIN and FA backups created by the app remain in Android app-private storage unless the user deliberately exports them.
+- BMW binary DATEN frame parser
+- E89 SGFAM parser
+- NCS AT description parser
+- `SWTFSWxx.DAT` / `SWTPSWxx.DAT` lookup parser
+- CABD `.Cxx` parser for:
+  - `PARZUWEISUNG_FSW`
+  - `PARZUWEISUNG_PSW1/2`
+  - `CODIERDATENBLOCK`
+  - `SPEICHERORG`
+  - `SGID_CODIERINDEX`
+- SP-Daten ZIP importer including `.C00..​.CFF` CABD files
 
-## Data files
+### RAD2 coding
 
-BMW EDIABAS/SP-Daten files are not distributed in this repository. In the app, choose **Import ECU / SP-Daten ZIP** and provide files you are licensed to use. The importer accepts the relevant `.PRG`, `.GRP`, NCS/DATEN and related files.
+The current coding engine is focused on the late E-series Professional Radio / RAD2 family.
 
-At minimum, E9x diagnosis requires the appropriate ECU group/variant PRG files, including the CAS group data. FA conversion also requires `FA.PRG`.
+It can:
 
-## Typical workflow
+- identify the reachable radio SGBD
+- read `ID_COD_INDEX`
+- locate a compatible CABD for that coding index
+- resolve FSW/PSW keywords from SWT data
+- read coding bytes through `C_C_LESEN`
+- decode enumerated FSW values
+- display `USB_RAD2`, `BLUETOOTH_RAD2`, `ULF_ECE` when present
+- edit any enumerated RAD2 FSW/PSW exposed by the loaded CABD
+- apply CABD masks without overwriting unrelated bits
+- write coding ranges with `C_C_AUFTRAG`
+- immediately re-read and verify the requested FSW value
+- create a private binary coding backup before a RAD2 write
 
-1. Import compatible ECU/SP-Daten files.
-2. Attach the USB K+DCAN adapter using USB OTG.
-3. Grant Android USB permission.
+A convenience action is included for:
+
+```text
+USB_RAD2 = aktiv
+```
+
+The generic RAD2 editor can also be used for other enumerated FSW/PSW pairs present in the loaded CABD.
+
+## Safety model
+
+Writes are deliberately gated. The app requires:
+
+- VIN read from the connected vehicle
+- locally entered expected VIN to match
+- battery voltage to be available and above the configured minimum
+- a backup
+- explicit write-mode arming
+- explicit acknowledgement that the direct FA/RAD2 writer is not yet physically validated
+
+The expected VIN is entered only on the Android device. No VIN is compiled into the app or committed to this repository. Backup directory names use a SHA-256-derived vehicle key rather than the VIN.
+
+## Data import
+
+Use **Import ECU / SP-Daten ZIP** and select a compatible E89/E9x data set that you are licensed to use.
+
+The importer separates data into:
+
+- `ecu/` — EDIABAS PRG/GRP files
+- `ncs/daten/` — E89 NCS tables and CABD `.Cxx` files
+- `ncs/sgdat/` — IPO files
+
+At minimum, diagnosis requires appropriate EDIABAS ECU group/variant files. FA conversion requires `FA.PRG`. RAD2 coding additionally requires the matching E89 SWT and CABD data.
+
+## Recommended first vehicle test
+
+Do the first session read-only:
+
+1. Import the E89 data ZIP.
+2. Attach the USB K+DCAN cable through OTG.
+3. Grant USB permission.
 4. Initialize EDIABAS.
 5. Enter the expected VIN locally.
-6. Read the VIN from the car and confirm the safety match.
-7. Read FA/VO copies.
-8. Scan faults if desired.
-9. Stage an SA-code addition or removal.
-10. Create a backup.
-11. Only if intentionally testing the write path: arm write mode and accept the experimental FA-write acknowledgement.
-12. Write. The app verifies each written FA by reading it back.
+6. Read VIN.
+7. Read FA/VO.
+8. Run the fault scan.
+9. Read RAD2 coding.
 
-## Important limitation
-
-Changing the FA/VO tells the vehicle what equipment is installed. It does **not yet reproduce NCS Expert's full `SG_CODIEREN`/DATEN coding-data generation** for an arbitrary ECU. For the Professional Radio retrofit, the remaining later milestone is default-coding the RAD2 from the updated VO or implementing the required RAD2 parameter coding.
-
-The FA writer remains labelled experimental until validated on physical E9x hardware.
+Only enable write mode after the read path has been confirmed against the physical vehicle.
 
 ## Build
 
-The repository includes a GitHub Actions workflow. A successful workflow run uploads the generated APK as the `BmwE9xTool-android` artifact.
+GitHub Actions performs:
+
+- privacy scan
+- core smoke tests
+- Android workload installation
+- EdiabasLib bootstrap
+- Release APK build
+- APK artifact upload
 
 Local build:
 
 ```bash
 bash scripts/bootstrap-ediabas.sh
 dotnet workload install android
-dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release -f net10.0-android36.1 -p:EnableAndroidTargets=true -p:EnableWindowsTargeting=true
+dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj \
+  -c Release \
+  -f net10.0-android36.1 \
+  -p:EnableAndroidTargets=true \
+  -p:EnableWindowsTargeting=true
 ```
 
-EdiabasLib is pinned by the bootstrap script to a known source revision to keep builds reproducible.
+EdiabasLib is pinned by the bootstrap script to a known source revision for reproducible builds.
+
+## Validation status
+
+The Android project and offline tests build successfully in CI. The FA and RAD2 write paths have defensive backups and read-back verification, but they are **not yet validated on the physical car**. That is the only remaining step before removing the experimental label from those write operations.
