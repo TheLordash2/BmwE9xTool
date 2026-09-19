@@ -10,5 +10,8 @@
     <Compile Include="../../src/BmwE9xTool.Android/Vehicle/Models.cs" Link="Vehicle/Models.cs" />
     <Compile Include="../../src/BmwE9xTool.Android/Coding/OptionCatalog.cs" Link="Coding/OptionCatalog.cs" />
     <Compile Include="../../src/BmwE9xTool.Android/Coding/FaEditor.cs" Link="Coding/FaEditor.cs" />
+    <Compile Include="../../src/BmwE9xTool.Android/Core/AppPaths.cs" Link="Core/AppPaths.cs" />
+    <Compile Include="../../src/BmwE9xTool.Android/Data/NcsSgfamParser.cs" Link="Data/NcsSgfamParser.cs" />
+    <Compile Include="../../src/BmwE9xTool.Android/Data/NcsAtParser.cs" Link="Data/NcsAtParser.cs" />
   </ItemGroup>
 </Project>
