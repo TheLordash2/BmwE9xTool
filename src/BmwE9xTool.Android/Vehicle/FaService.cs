@@ -25,7 +25,7 @@ public sealed class FaService
         _sgfam = sgfam;
     }
 
-    public async Task<IReadOnlyList<VehicleOrder>> ReadAllAvailableAsync(CancellationToken ct = default)
+    public IReadOnlyList<(string Name, string Sgbd)> GetFaCandidates()
     {
         var candidates = new List<(string Name, string Sgbd)>();
         candidates.AddRange(FallbackCandidates);
@@ -33,19 +33,37 @@ public sealed class FaService
         foreach (var entry in _sgfam.Read().Where(x => x.FaHolder))
             candidates.Add((entry.LogicalName, entry.Sgbd));
 
+        return candidates
+            .GroupBy(x => x.Sgbd, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<VehicleOrder>> ReadAllAvailableAsync(
+        CancellationToken ct = default)
+    {
         var list = new List<VehicleOrder>();
-        foreach (var c in candidates
-                     .GroupBy(x => x.Sgbd, StringComparer.OrdinalIgnoreCase)
-                     .Select(g => g.First()))
+
+        foreach (var candidate in GetFaCandidates())
         {
             try
             {
-                if (!await _session.JobExistsAsync(c.Sgbd, "C_FA_LESEN", ct)) continue;
-                list.Add(await ReadFromAsync(c.Name, c.Sgbd, ct));
+                if (!await _session.JobExistsAsync(
+                        candidate.Sgbd,
+                        "C_FA_LESEN",
+                        ct))
+                    continue;
+
+                list.Add(
+                    await ReadFromAsync(
+                        candidate.Name,
+                        candidate.Sgbd,
+                        ct));
             }
             catch (Exception ex)
             {
-                _log.Add($"FA read {c.Name}/{c.Sgbd} skipped: {ex.Message}");
+                _log.Add(
+                    $"FA read {candidate.Name}/{candidate.Sgbd} skipped: {ex.Message}");
             }
         }
 
@@ -58,32 +76,65 @@ public sealed class FaService
     public Task<VehicleOrder> ReadCasAsync(CancellationToken ct = default) =>
         ReadFromAsync("CAS", "D_CAS", ct);
 
-    public async Task<VehicleOrder> ReadFromAsync(string source, string sgbd, CancellationToken ct = default)
+    public async Task<VehicleOrder> ReadFromAsync(
+        string source,
+        string sgbd,
+        CancellationToken ct = default)
     {
-        var read = await _session.RunJobAsync(sgbd, "C_FA_LESEN", ct: ct);
+        var read = await _session.RunJobAsync(
+            sgbd,
+            "C_FA_LESEN",
+            ct: ct);
+
         var raw = FindString(read, "FAHRZEUGAUFTRAG")
-                  ?? throw new InvalidOperationException($"{source} returned no FAHRZEUGAUFTRAG.");
+                  ?? throw new InvalidOperationException(
+                      $"{source} returned no FAHRZEUGAUFTRAG.");
+
         return await ParseAsync(source, raw, ct);
     }
 
-    public async Task<VehicleOrder> ParseAsync(string source, string raw, CancellationToken ct = default)
+    public async Task<VehicleOrder> ParseAsync(
+        string source,
+        string raw,
+        CancellationToken ct = default)
     {
-        var parse = await _session.RunJobAsync("FA", "FA_STREAM2STRUCT", "1;" + raw, ct: ct);
-        var all = parse.Sets.SelectMany(x => x.Values)
-            .ToLookup(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+        var parse = await _session.RunJobAsync(
+            "FA",
+            "FA_STREAM2STRUCT",
+            "1;" + raw,
+            ct: ct);
+
+        var all = parse.Sets
+            .SelectMany(x => x.Values)
+            .ToLookup(
+                x => x.Key,
+                x => x.Value,
+                StringComparer.OrdinalIgnoreCase);
 
         string? One(string name) =>
-            all[name].Select(v => v?.ToString()).FirstOrDefault(v => !string.IsNullOrEmpty(v));
+            all[name]
+                .Select(v => v?.ToString())
+                .FirstOrDefault(v => !string.IsNullOrEmpty(v));
 
         IReadOnlyList<string> Indexed(string prefix)
         {
             var result = new List<(int Index, string Value)>();
+
             foreach (var set in parse.Sets)
             foreach (var kv in set.Values)
             {
-                if (!kv.Key.StartsWith(prefix + "_", StringComparison.OrdinalIgnoreCase) || kv.Value == null) continue;
-                if (int.TryParse(kv.Key[(prefix.Length + 1)..], out var index))
+                if (!kv.Key.StartsWith(
+                        prefix + "_",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    kv.Value == null)
+                    continue;
+
+                if (int.TryParse(
+                        kv.Key[(prefix.Length + 1)..],
+                        out var index))
+                {
                     result.Add((index, kv.Value.ToString()!));
+                }
             }
 
             return result
@@ -108,7 +159,10 @@ public sealed class FaService
             Indexed("E_WORT"),
             Indexed("ZUSBAU"));
 
-        _log.Add($"FA {source}: version={vo.Version ?? "?"}, {vo.Sa.Count} SA codes, BR={vo.Chassis}, date={vo.ProductionDate}");
+        _log.Add(
+            $"FA {source}: version={vo.Version ?? "?"}, " +
+            $"{vo.Sa.Count} SA codes, BR={vo.Chassis}, date={vo.ProductionDate}");
+
         return vo;
     }
 
@@ -117,8 +171,10 @@ public sealed class FaService
         foreach (var set in result.Sets)
         {
             var value = set.String(key);
-            if (!string.IsNullOrEmpty(value)) return value;
+            if (!string.IsNullOrEmpty(value))
+                return value;
         }
+
         return null;
     }
 }
