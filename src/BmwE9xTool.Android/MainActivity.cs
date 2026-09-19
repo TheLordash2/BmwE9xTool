@@ -27,7 +27,8 @@ public sealed class MainActivity : Activity
     private UsbManager _usb = null!;
     private EdiabasSession _session = null!;
     private VehicleIdentityService _identity = null!;
-    private NcsSgfamParser _sgfam = null!;\n    private NcsAtParser _at = null!;
+    private NcsSgfamParser _sgfam = null!;
+    private NcsAtParser _at = null!;
     private FaService _faService = null!;
     private FaultService _faults = null!;
     private BackupService _backups = null!;
@@ -63,6 +64,7 @@ public sealed class MainActivity : Activity
         _session = new EdiabasSession(_paths, _log, _usb);
         _identity = new VehicleIdentityService(_session, _log);
         _sgfam = new NcsSgfamParser(_paths);
+        _at = new NcsAtParser(_paths);
         _faService = new FaService(_session, _log, _sgfam);
         _faults = new FaultService(_session, _log, _sgfam);
         _backups = new BackupService(_paths, _log);
@@ -268,6 +270,7 @@ public sealed class MainActivity : Activity
             _status.Text = "Importing data...";
 
             var count = await DataImporter.ImportZipAsync(input, _paths.Root);
+            _at.Invalidate();
 
             _log.Add($"Imported {count} BMW data files.");
             _output.Text = $"Imported {count} supported ECU/DATEN files.";
