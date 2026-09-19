@@ -35,6 +35,7 @@ public sealed class MainActivity : Activity
     private CabdCatalog _cabd = null!;
     private Rad2CodingService _rad2 = null!;
     private DataHealthService _dataHealth = null!;
+    private StarterDataInstaller _starterData = null!;
     private FaService _faService = null!;
     private FaultService _faults = null!;
     private BackupService _backups = null!;
@@ -77,6 +78,7 @@ public sealed class MainActivity : Activity
         _cabd = new CabdCatalog(_paths, _swt);
         _rad2 = new Rad2CodingService(_session, _cabd, _log);
         _dataHealth = new DataHealthService(_paths, _sgfam, _swt, _cabd);
+        _starterData = new StarterDataInstaller(Assets!, _paths);
         _faService = new FaService(_session, _log, _sgfam);
         _faults = new FaultService(_session, _log, _sgfam);
         _backups = new BackupService(_paths, _log);
@@ -149,6 +151,7 @@ public sealed class MainActivity : Activity
         AddSection(root, "Connection");
 
         _status = AddText(root, string.Empty);
+        AddButton(root, "Install bundled E9x starter data", async () => await InstallStarterDataAsync());
         AddButton(root, "Import ECU / SP-Daten ZIP", PickDataZip);
         AddButton(root, "Run offline data self-test", RunDataSelfTest);
         AddButton(root, "Scan USB + request permission", ScanAndRequestUsb);
@@ -280,6 +283,30 @@ public sealed class MainActivity : Activity
                 ViewGroup.LayoutParams.WrapContent));
 
         return view;
+    }
+
+    private async Task InstallStarterDataAsync()
+    {
+        await BusyAsync("Installing bundled E9x starter data...", async () =>
+        {
+            var result = await _starterData.InstallAsync();
+
+            if (!result.Available)
+            {
+                _output.Text =
+                    "This APK was built without an embedded E9x starter-data package. " +
+                    "Use Import ECU / SP-Daten ZIP, or rebuild with E9xStarterDataDir pointing to a locally prepared starter pack.";
+                return;
+            }
+
+            _at.Invalidate();
+            _swt.Invalidate();
+
+            _output.Text =
+                $"Installed {result.FilesInstalled} bundled E9x starter-data files into app-private storage.";
+
+            _log.Add($"Bundled E9x starter data installed: {result.FilesInstalled} files.");
+        });
     }
 
     private void RunDataSelfTest()
