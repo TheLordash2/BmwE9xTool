@@ -4,18 +4,31 @@ on:
   push:
     branches: [ main ]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
       - name: Install Android workload
         run: dotnet workload install android
+
       - name: Bootstrap EdiabasLib
         run: bash scripts/bootstrap-ediabas.sh
-      - name: Build
+
+      - name: Build Release APK
         run: dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BmwE9xTool-android
+          path: src/BmwE9xTool.Android/bin/Release/**/*.apk
+          if-no-files-found: error
