@@ -34,6 +34,7 @@ public sealed class MainActivity : Activity
     private SwtCatalog _swt = null!;
     private CabdCatalog _cabd = null!;
     private Rad2CodingService _rad2 = null!;
+    private DataHealthService _dataHealth = null!;
     private FaService _faService = null!;
     private FaultService _faults = null!;
     private BackupService _backups = null!;
@@ -75,6 +76,7 @@ public sealed class MainActivity : Activity
         _swt = new SwtCatalog(_paths);
         _cabd = new CabdCatalog(_paths, _swt);
         _rad2 = new Rad2CodingService(_session, _cabd, _log);
+        _dataHealth = new DataHealthService(_paths, _sgfam, _swt, _cabd);
         _faService = new FaService(_session, _log, _sgfam);
         _faults = new FaultService(_session, _log, _sgfam);
         _backups = new BackupService(_paths, _log);
@@ -148,6 +150,7 @@ public sealed class MainActivity : Activity
 
         _status = AddText(root, string.Empty);
         AddButton(root, "Import ECU / SP-Daten ZIP", PickDataZip);
+        AddButton(root, "Run offline data self-test", RunDataSelfTest);
         AddButton(root, "Scan USB + request permission", ScanAndRequestUsb);
         _connect = AddButton(root, "Initialize EDIABAS", InitializeSession);
 
@@ -277,6 +280,25 @@ public sealed class MainActivity : Activity
                 ViewGroup.LayoutParams.WrapContent));
 
         return view;
+    }
+
+    private void RunDataSelfTest()
+    {
+        try
+        {
+            var items = _dataHealth.Run();
+            var lines = items.Select(x =>
+                (x.Ok ? "PASS" : "FAIL") + "  " + x.Name + "\n  " + x.Detail);
+
+            _output.Text = string.Join("\n\n", lines);
+
+            foreach (var item in items)
+                _log.Add($"DATA SELF-TEST {(item.Ok ? "PASS" : "FAIL")}: {item.Name} — {item.Detail}");
+        }
+        catch (Exception ex)
+        {
+            ShowError("Data self-test failed", ex);
+        }
     }
 
     private void PickDataZip()
