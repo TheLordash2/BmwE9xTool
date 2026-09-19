@@ -31,6 +31,9 @@ public sealed class MainActivity : Activity
     private VehicleIdentityService _identity = null!;
     private NcsSgfamParser _sgfam = null!;
     private NcsAtParser _at = null!;
+    private SwtCatalog _swt = null!;
+    private CabdCatalog _cabd = null!;
+    private Rad2CodingService _rad2 = null!;
     private FaService _faService = null!;
     private FaultService _faults = null!;
     private BackupService _backups = null!;
@@ -67,6 +70,9 @@ public sealed class MainActivity : Activity
         _identity = new VehicleIdentityService(_session, _log);
         _sgfam = new NcsSgfamParser(_paths);
         _at = new NcsAtParser(_paths);
+        _swt = new SwtCatalog(_paths);
+        _cabd = new CabdCatalog(_paths, _swt);
+        _rad2 = new Rad2CodingService(_session, _cabd, _log);
         _faService = new FaService(_session, _log, _sgfam);
         _faults = new FaultService(_session, _log, _sgfam);
         _backups = new BackupService(_paths, _log);
@@ -168,6 +174,11 @@ public sealed class MainActivity : Activity
             _optionInput.Text = "6FL";
             EditOption(true);
         });
+
+        AddSection(root, "RAD2 coding");
+
+        AddButton(root, "Read RAD2 USB/Bluetooth coding", async () => await ReadRad2CodingAsync());
+        AddButton(root, "Set USB_RAD2 = aktiv", async () => await SetRad2UsbAsync());
 
         AddSection(root, "Backup and write");
 
@@ -273,6 +284,7 @@ public sealed class MainActivity : Activity
 
             var count = await DataImporter.ImportZipAsync(input, _paths.Root);
             _at.Invalidate();
+            _swt.Invalidate();
 
             _log.Add($"Imported {count} BMW data files.");
             _output.Text = $"Imported {count} supported ECU/DATEN files.";
@@ -416,6 +428,85 @@ public sealed class MainActivity : Activity
                                     ? $"  present={f.Present.Value}"
                                     : string.Empty)));
             });
+    }
+
+    private async Task ReadRad2CodingAsync()
+    {
+        await BusyAsync("Reading RAD2 coding...", async () =>
+        {
+            var target = await _rad2.DetectAsync();
+            var states = await _rad2.ReadKnownStatesAsync(target);
+
+            var lines = new List<string>
+            {
+                $"RAD2 target: {target.Sgbd}",
+                $"Coding index: 0x{target.CodingIndex:X2}",
+                $"CABD: {Path.GetFileName(target.Cabd.FilePath)}",
+                string.Empty
+            };
+
+            foreach (var state in states)
+            {
+                lines.Add(
+                    state.Function + " = " +
+                    (state.CurrentValue ?? "unknown") +
+                    "   [" +
+                    string.Join(", ", state.AvailableValues) +
+                    "]");
+            }
+
+            _output.Text = string.Join(System.Environment.NewLine, lines);
+        });
+    }
+
+    private async Task SetRad2UsbAsync()
+    {
+        if (_vin == null || !VehicleConfig.VinMatches(_vin))
+        {
+            _output.Text = "RAD2 WRITE BLOCKED\n- read VIN first\n- configured local safety VIN must match";
+            return;
+        }
+
+        var voltage = _session.BatteryVoltage();
+        var gate = new WriteGateState(
+            VinMatches: true,
+            BackupCreated: true,
+            VoltageKnown: voltage.HasValue,
+            Voltage: voltage,
+            UserArmed: _writeArmed,
+            ExperimentalWriteAccepted: _experimentalWriteAccepted);
+
+        if (!gate.Allowed)
+        {
+            _output.Text =
+                "RAD2 WRITE BLOCKED\n" +
+                string.Join("\n", gate.Blockers().Select(x => "- " + x));
+            return;
+        }
+
+        await BusyAsync("Backing up and coding RAD2 USB...", async () =>
+        {
+            var target = await _rad2.DetectAsync();
+            var original = await _rad2.ReadCodingAsync(target);
+
+            await _backups.SaveBinaryAsync(
+                _vin,
+                "rad2_before_usb",
+                original);
+
+            var status = await _rad2.SetParameterAsync(
+                target,
+                "USB_RAD2",
+                "aktiv");
+
+            var states = await _rad2.ReadKnownStatesAsync(target);
+            var usb = states.FirstOrDefault(
+                x => x.Function.Equals("USB_RAD2", StringComparison.OrdinalIgnoreCase));
+
+            _output.Text =
+                "RAD2 USB CODING " + status + "\n" +
+                "USB_RAD2 = " + (usb?.CurrentValue ?? "unknown");
+        });
     }
 
     private void EditOption(bool add)
