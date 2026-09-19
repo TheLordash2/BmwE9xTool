@@ -30,11 +30,7 @@ public sealed class FaService
             try
             {
                 if (!await _session.JobExistsAsync(c.Sgbd, "C_FA_LESEN", ct)) continue;
-                var read = await _session.RunJobAsync(c.Sgbd, "C_FA_LESEN", ct: ct);
-                var raw = FindString(read, "FAHRZEUGAUFTRAG");
-                if (string.IsNullOrEmpty(raw)) continue;
-                var parsed = await ParseAsync(c.Name, raw, ct);
-                list.Add(parsed);
+                list.Add(await ReadFromAsync(c.Name, c.Sgbd, ct));
             }
             catch (Exception ex)
             {
@@ -47,21 +43,27 @@ public sealed class FaService
         return list;
     }
 
-    public async Task<VehicleOrder> ReadCasAsync(CancellationToken ct = default)
+    public Task<VehicleOrder> ReadCasAsync(CancellationToken ct = default) =>
+        ReadFromAsync("CAS", "D_CAS", ct);
+
+    public async Task<VehicleOrder> ReadFromAsync(string source, string sgbd, CancellationToken ct = default)
     {
-        var read = await _session.RunJobAsync("D_CAS", "C_FA_LESEN", ct: ct);
+        var read = await _session.RunJobAsync(sgbd, "C_FA_LESEN", ct: ct);
         var raw = FindString(read, "FAHRZEUGAUFTRAG")
-                  ?? throw new InvalidOperationException("CAS returned no FAHRZEUGAUFTRAG.");
-        return await ParseAsync("CAS", raw, ct);
+                  ?? throw new InvalidOperationException($"{source} returned no FAHRZEUGAUFTRAG.");
+        return await ParseAsync(source, raw, ct);
     }
 
-    private async Task<VehicleOrder> ParseAsync(string source, string raw, CancellationToken ct)
+    public async Task<VehicleOrder> ParseAsync(string source, string raw, CancellationToken ct = default)
     {
         var parse = await _session.RunJobAsync("FA", "FA_STREAM2STRUCT", "1;" + raw, ct: ct);
-        var all = parse.Sets.SelectMany(x => x.Values).ToLookup(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+        var all = parse.Sets.SelectMany(x => x.Values)
+            .ToLookup(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
-        string? One(string name) => all[name].Select(v => v?.ToString()).FirstOrDefault(v => !string.IsNullOrEmpty(v));
-        IReadOnlyList<string> Indexed(string prefix, string countName)
+        string? One(string name) =>
+            all[name].Select(v => v?.ToString()).FirstOrDefault(v => !string.IsNullOrEmpty(v));
+
+        IReadOnlyList<string> Indexed(string prefix)
         {
             var result = new List<(int Index, string Value)>();
             foreach (var set in parse.Sets)
@@ -71,28 +73,32 @@ public sealed class FaService
                 if (int.TryParse(kv.Key[(prefix.Length + 1)..], out var index))
                     result.Add((index, kv.Value.ToString()!));
             }
-            return result.OrderBy(x => x.Index).Select(x => x.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return result.OrderBy(x => x.Index)
+                .Select(x => x.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         var vo = new VehicleOrder(
             source,
             raw,
             One("STANDARD_FA"),
+            One("VERSION"),
             One("BR")?.TrimEnd('_'),
             One("C_DATE")?.TrimStart('#'),
             One("C_TYP")?.TrimStart('*'),
             One("LACK")?.TrimStart('%'),
             One("POLSTER")?.TrimStart('&'),
-            Indexed("SA", "SA_ANZ"),
-            Indexed("HO_WORT", "HO_WORT_ANZ"),
-            Indexed("E_WORT", "E_WORT_ANZ"),
-            Indexed("ZUSBAU", "ZUSBAU_ANZ"));
+            Indexed("SA"),
+            Indexed("HO_WORT"),
+            Indexed("E_WORT"),
+            Indexed("ZUSBAU"));
 
-        _log.Add($"FA {source}: {vo.Sa.Count} SA codes, BR={vo.Chassis}, date={vo.ProductionDate}");
+        _log.Add($"FA {source}: version={vo.Version ?? "?"}, {vo.Sa.Count} SA codes, BR={vo.Chassis}, date={vo.ProductionDate}");
         return vo;
     }
 
-    private static string? FindString(JobResult result, string key)
+    public static string? FindString(JobResult result, string key)
     {
         foreach (var set in result.Sets)
         {
