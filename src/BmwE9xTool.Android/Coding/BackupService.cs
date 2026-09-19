@@ -43,6 +43,29 @@ public sealed class BackupService
         return folder;
     }
 
+    public async Task<string> SaveBinaryAsync(
+        string vin,
+        string name,
+        byte[] data,
+        CancellationToken ct = default)
+    {
+        var vehicleKey = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(vin.Trim().ToUpperInvariant())))[..12];
+
+        var folder = Path.Combine(
+            _paths.Backups,
+            "vehicle_" + vehicleKey,
+            DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+
+        Directory.CreateDirectory(folder);
+
+        var path = Path.Combine(folder, Sanitize(name).ToLowerInvariant() + ".bin");
+        await File.WriteAllBytesAsync(path, data, ct);
+
+        _log.Add("Binary coding backup created in private app storage.");
+        return path;
+    }
+
     private static string Sanitize(string value) =>
         string.Concat(value.Where(c => char.IsLetterOrDigit(c) || c is '-' or '_'));
 }
