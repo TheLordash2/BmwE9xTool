@@ -17,12 +17,6 @@ public sealed class FaWriteEngine
     private readonly FaService _fa;
     private readonly AppLog _log;
 
-    private static readonly (string Name, string Sgbd)[] PreferredTargets =
-    [
-        ("CAS", "D_CAS"),
-        ("FRM87", "FRM_87")
-    ];
-
     public FaWriteEngine(EdiabasSession session, FaService fa, AppLog log)
     {
         _session = session;
@@ -36,7 +30,7 @@ public sealed class FaWriteEngine
     public async Task<IReadOnlyList<string>> DiscoverTargetsAsync(CancellationToken ct = default)
     {
         var targets = new List<string>();
-        foreach (var target in PreferredTargets)
+        foreach (var target in OrderedTargets())
         {
             try
             {
@@ -83,7 +77,7 @@ public sealed class FaWriteEngine
         var ecuStream = await ConvertForEcuAsync(original, modifiedStandardFa, ct);
         var written = new List<string>();
 
-        foreach (var target in PreferredTargets)
+        foreach (var target in OrderedTargets())
         {
             ct.ThrowIfCancellationRequested();
 
@@ -114,6 +108,22 @@ public sealed class FaWriteEngine
             throw new InvalidOperationException("No supported FA write target was found.");
 
         return written;
+    }
+
+    private IReadOnlyList<(string Name, string Sgbd)> OrderedTargets()
+    {
+        // Write redundant/backup FA holders first and CAS last. If a later
+        // target fails, the primary CAS copy is less likely to have been
+        // changed before the failure.
+        return _fa.GetFaCandidates()
+            .Where(x =>
+                !string.IsNullOrWhiteSpace(x.Sgbd))
+            .OrderBy(x =>
+                x.Name.Equals("CAS", StringComparison.OrdinalIgnoreCase) ||
+                x.Sgbd.Equals("D_CAS", StringComparison.OrdinalIgnoreCase)
+                    ? 1
+                    : 0)
+            .ToList();
     }
 
     private static string NormalizeFa(string value) =>
