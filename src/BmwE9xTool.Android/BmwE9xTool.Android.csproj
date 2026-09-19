@@ -7,8 +7,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.thelordash2.bmwe9xtool</ApplicationId>
     <ApplicationTitle>BMW E9x Tool</ApplicationTitle>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>0.3.0</ApplicationDisplayVersion>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+    <AndroidEnableMultiDex>true</AndroidEnableMultiDex>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AndroidLinkTool>r8</AndroidLinkTool>
   </PropertyGroup>
 
   <ItemGroup>
