@@ -30,7 +30,7 @@ jobs:
         run: bash scripts/bootstrap-ediabas.sh
 
       - name: Build Release APK
-        run: dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release
+        run: dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release -f net10.0-android36.1 -p:EnableWindowsTargeting=true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
