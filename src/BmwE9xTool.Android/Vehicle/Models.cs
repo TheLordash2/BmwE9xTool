@@ -18,6 +18,7 @@ public sealed record VehicleOrder(
     string Source,
     string RawFa,
     string? StandardFa,
+    string? Version,
     string? Chassis,
     string? ProductionDate,
     string? TypeCode,
@@ -28,8 +29,7 @@ public sealed record VehicleOrder(
     IReadOnlyList<string> EWords,
     IReadOnlyList<string> ZbWords)
 {
-    public string Display =>
-        string.Join(" ", Sa.Select(x => "$" + x));
+    public string Display => string.Join(" ", Sa.Select(x => "$" + x));
 }
 
 public sealed record EcuTarget(string Name, string Sgbd, string Description);
