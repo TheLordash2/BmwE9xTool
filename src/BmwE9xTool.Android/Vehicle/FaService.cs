@@ -1,4 +1,5 @@
 using BmwE9xTool.Core;
+using BmwE9xTool.Data;
 using BmwE9xTool.Ediabas;
 
 namespace BmwE9xTool.Vehicle;
@@ -7,8 +8,9 @@ public sealed class FaService
 {
     private readonly EdiabasSession _session;
     private readonly AppLog _log;
+    private readonly NcsSgfamParser _sgfam;
 
-    private static readonly (string Name, string Sgbd)[] Candidates =
+    private static readonly (string Name, string Sgbd)[] FallbackCandidates =
     [
         ("CAS", "D_CAS"),
         ("FRM87", "FRM_87"),
@@ -16,16 +18,25 @@ public sealed class FaService
         ("KBM", "D_KBM")
     ];
 
-    public FaService(EdiabasSession session, AppLog log)
+    public FaService(EdiabasSession session, AppLog log, NcsSgfamParser sgfam)
     {
         _session = session;
         _log = log;
+        _sgfam = sgfam;
     }
 
     public async Task<IReadOnlyList<VehicleOrder>> ReadAllAvailableAsync(CancellationToken ct = default)
     {
+        var candidates = new List<(string Name, string Sgbd)>();
+        candidates.AddRange(FallbackCandidates);
+
+        foreach (var entry in _sgfam.Read().Where(x => x.FaHolder))
+            candidates.Add((entry.LogicalName, entry.Sgbd));
+
         var list = new List<VehicleOrder>();
-        foreach (var c in Candidates)
+        foreach (var c in candidates
+                     .GroupBy(x => x.Sgbd, StringComparer.OrdinalIgnoreCase)
+                     .Select(g => g.First()))
         {
             try
             {
@@ -40,6 +51,7 @@ public sealed class FaService
 
         if (list.Count == 0)
             throw new InvalidOperationException("No readable FA/VO copy found.");
+
         return list;
     }
 
@@ -73,7 +85,9 @@ public sealed class FaService
                 if (int.TryParse(kv.Key[(prefix.Length + 1)..], out var index))
                     result.Add((index, kv.Value.ToString()!));
             }
-            return result.OrderBy(x => x.Index)
+
+            return result
+                .OrderBy(x => x.Index)
                 .Select(x => x.Value)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
