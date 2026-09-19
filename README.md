@@ -62,7 +62,7 @@ Local build:
 ```bash
 bash scripts/bootstrap-ediabas.sh
 dotnet workload install android
-dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release
+dotnet build src/BmwE9xTool.Android/BmwE9xTool.Android.csproj -c Release -f net10.0-android36.1 -p:EnableAndroidTargets=true -p:EnableWindowsTargeting=true
 ```
 
 EdiabasLib is pinned by the bootstrap script to a known source revision to keep builds reproducible.
