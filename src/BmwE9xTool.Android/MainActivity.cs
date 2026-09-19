@@ -6,6 +6,8 @@ using Android.Text;
 using Android.Views;
 using Android.Views.InputMethods;
 using Android.Widget;
+using AndroidTypeface = global::Android.Graphics.Typeface;
+using AndroidTypefaceStyle = global::Android.Graphics.TypefaceStyle;
 using BmwE9xTool.Coding;
 using BmwE9xTool.Core;
 using BmwE9xTool.Data;
@@ -99,7 +101,7 @@ public sealed class MainActivity : Activity
 
         var title = new TextView(this) { Text = "BMW E9x Tool" };
         title.TextSize = 26;
-        title.SetTypeface(null, Android.Graphics.TypefaceStyle.Bold);
+        title.SetTypeface(null, AndroidTypefaceStyle.Bold);
         root.AddView(title);
 
         root.AddView(new TextView(this)
@@ -112,9 +114,9 @@ public sealed class MainActivity : Activity
         _expectedVinInput = new EditText(this)
         {
             Hint = "Enter expected 17-character VIN locally",
-            SingleLine = true,
             InputType = InputTypes.ClassText | InputTypes.TextFlagCapCharacters
         };
+        _expectedVinInput.SetSingleLine(true);
         root.AddView(_expectedVinInput);
 
         AddButton(root, "Set expected VIN locally", () =>
@@ -153,9 +155,9 @@ public sealed class MainActivity : Activity
         _optionInput = new EditText(this)
         {
             Hint = "SA code, e.g. 6FL",
-            SingleLine = true,
             InputType = InputTypes.ClassText | InputTypes.TextFlagCapCharacters
         };
+        _optionInput.SetSingleLine(true);
         root.AddView(_optionInput);
 
         AddButton(root, "Add option code", () => EditOption(true));
@@ -204,7 +206,7 @@ public sealed class MainActivity : Activity
 
         _logView = AddText(root, string.Empty);
         _logView.SetTextIsSelectable(true);
-        _logView.SetTypeface(Android.Graphics.Typeface.Monospace, Android.Graphics.TypefaceStyle.Normal);
+        _logView.SetTypeface(AndroidTypeface.Monospace, AndroidTypefaceStyle.Normal);
         _logView.TextSize = 11;
 
         SetContentView(scroll);
@@ -213,7 +215,7 @@ public sealed class MainActivity : Activity
     private void AddSection(LinearLayout root, string text)
     {
         var label = new TextView(this) { Text = text };
-        label.SetTypeface(null, Android.Graphics.TypefaceStyle.Bold);
+        label.SetTypeface(null, AndroidTypefaceStyle.Bold);
         label.SetPadding(0, Dp(18), 0, Dp(4));
         root.AddView(label);
     }
@@ -406,7 +408,7 @@ public sealed class MainActivity : Activity
                 _output.Text = records.Count == 0
                     ? "No fault records returned from reachable modules."
                     : string.Join(
-                        Environment.NewLine,
+                        System.Environment.NewLine,
                         records.Select(
                             f =>
                                 $"{f.Ecu}: {f.Code ?? "(no code)"}  {f.Text ?? string.Empty}" +
@@ -567,7 +569,7 @@ public sealed class MainActivity : Activity
             lines.Add("FA copies match: " + (same ? "YES" : "NO"));
         }
 
-        _output.Text = string.Join(Environment.NewLine, lines);
+        _output.Text = string.Join(System.Environment.NewLine, lines);
     }
 
     private async Task BusyAsync(string message, Func<Task> operation)
