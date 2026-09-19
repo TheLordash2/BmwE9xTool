@@ -45,6 +45,8 @@ public sealed class MainActivity : Activity
     private TextView _logView = null!;
     private EditText _expectedVinInput = null!;
     private EditText _optionInput = null!;
+    private EditText _rad2FswInput = null!;
+    private EditText _rad2PswInput = null!;
     private Button _connect = null!;
     private Button _readVin = null!;
     private Button _readFa = null!;
@@ -179,6 +181,25 @@ public sealed class MainActivity : Activity
 
         AddButton(root, "Read RAD2 USB/Bluetooth coding", async () => await ReadRad2CodingAsync());
         AddButton(root, "Set USB_RAD2 = aktiv", async () => await SetRad2UsbAsync());
+
+        _rad2FswInput = new EditText(this)
+        {
+            Hint = "RAD2 FSW, e.g. USB_RAD2",
+            InputType = InputTypes.ClassText | InputTypes.TextFlagCapCharacters
+        };
+        _rad2FswInput.SetSingleLine(true);
+        root.AddView(_rad2FswInput);
+
+        _rad2PswInput = new EditText(this)
+        {
+            Hint = "PSW, e.g. aktiv",
+            InputType = InputTypes.ClassText
+        };
+        _rad2PswInput.SetSingleLine(true);
+        root.AddView(_rad2PswInput);
+
+        AddButton(root, "Read RAD2 FSW", async () => await ReadRad2FswAsync());
+        AddButton(root, "Write RAD2 FSW = PSW", async () => await WriteRad2FswAsync());
 
         AddSection(root, "Backup and write");
 
@@ -456,6 +477,79 @@ public sealed class MainActivity : Activity
             }
 
             _output.Text = string.Join(System.Environment.NewLine, lines);
+        });
+    }
+
+    private async Task ReadRad2FswAsync()
+    {
+        var fsw = _rad2FswInput.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(fsw))
+        {
+            _output.Text = "Enter a RAD2 FSW name first.";
+            return;
+        }
+
+        await BusyAsync("Reading RAD2 FSW...", async () =>
+        {
+            var target = await _rad2.DetectAsync();
+            var state = await _rad2.ReadStateAsync(target, fsw);
+
+            _output.Text =
+                state.Function + " = " + (state.CurrentValue ?? "unknown") +
+                "\nAvailable: " + string.Join(", ", state.AvailableValues);
+        });
+    }
+
+    private async Task WriteRad2FswAsync()
+    {
+        var fsw = _rad2FswInput.Text?.Trim();
+        var psw = _rad2PswInput.Text?.Trim();
+
+        if (string.IsNullOrWhiteSpace(fsw) || string.IsNullOrWhiteSpace(psw))
+        {
+            _output.Text = "Enter both RAD2 FSW and PSW.";
+            return;
+        }
+
+        if (_vin == null || !VehicleConfig.VinMatches(_vin))
+        {
+            _output.Text = "RAD2 WRITE BLOCKED\n- read VIN first\n- configured local safety VIN must match";
+            return;
+        }
+
+        var voltage = _session.BatteryVoltage();
+        var gate = new WriteGateState(
+            VinMatches: true,
+            BackupCreated: true,
+            VoltageKnown: voltage.HasValue,
+            Voltage: voltage,
+            UserArmed: _writeArmed,
+            ExperimentalWriteAccepted: _experimentalWriteAccepted);
+
+        if (!gate.Allowed)
+        {
+            _output.Text =
+                "RAD2 WRITE BLOCKED\n" +
+                string.Join("\n", gate.Blockers().Select(x => "- " + x));
+            return;
+        }
+
+        await BusyAsync("Backing up and writing RAD2 FSW...", async () =>
+        {
+            var target = await _rad2.DetectAsync();
+            var original = await _rad2.ReadCodingAsync(target);
+
+            await _backups.SaveBinaryAsync(
+                _vin,
+                "rad2_before_" + fsw,
+                original);
+
+            var status = await _rad2.SetParameterAsync(target, fsw, psw);
+            var state = await _rad2.ReadStateAsync(target, fsw);
+
+            _output.Text =
+                "RAD2 CODING " + status +
+                "\n" + state.Function + " = " + (state.CurrentValue ?? "unknown");
         });
     }
 
