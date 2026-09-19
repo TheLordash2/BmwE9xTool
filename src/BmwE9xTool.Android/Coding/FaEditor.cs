@@ -1,7 +1,12 @@
+using System.Text.RegularExpressions;
 using BmwE9xTool.Vehicle;
 
 namespace BmwE9xTool.Coding;
 
+/// <summary>
+/// Edits only $SA tokens while preserving every other token and ordering from
+/// the ECU-provided STANDARD_FA string.
+/// </summary>
 public sealed class FaEditor
 {
     private readonly VehicleOrder _original;
@@ -10,7 +15,9 @@ public sealed class FaEditor
     public FaEditor(VehicleOrder original)
     {
         _original = original;
-        _sa = new SortedSet<string>(original.Sa.Select(OptionCatalog.Normalize), StringComparer.OrdinalIgnoreCase);
+        _sa = new SortedSet<string>(
+            original.Sa.Select(OptionCatalog.Normalize),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     public VehicleOrder Original => _original;
@@ -21,23 +28,25 @@ public sealed class FaEditor
 
     public string BuildStandardFa()
     {
-        if (string.IsNullOrWhiteSpace(_original.Chassis))
-            throw new InvalidOperationException("FA chassis/BR is missing.");
-        if (string.IsNullOrWhiteSpace(_original.ProductionDate))
-            throw new InvalidOperationException("FA production date is missing.");
-        if (string.IsNullOrWhiteSpace(_original.TypeCode))
-            throw new InvalidOperationException("FA type code is missing.");
+        var source = _original.StandardFa;
+        if (string.IsNullOrWhiteSpace(source))
+            throw new InvalidOperationException("STANDARD_FA is missing; refusing to rebuild FA.");
 
-        var s = _original.Chassis!;
-        if (!s.EndsWith("_", StringComparison.Ordinal)) s += "_";
-        s += "#" + _original.ProductionDate!.TrimStart('#');
-        s += "*" + _original.TypeCode!.TrimStart('*');
-        if (!string.IsNullOrEmpty(_original.Paint)) s += "%" + _original.Paint!.TrimStart('%');
-        if (!string.IsNullOrEmpty(_original.Upholstery)) s += "&" + _original.Upholstery!.TrimStart('&');
-        foreach (var z in _original.ZbWords) s += "|" + z.TrimStart('|');
-        foreach (var code in _sa) s += "$" + code;
-        foreach (var h in _original.HoWords) s += "+" + h.TrimStart('+');
-        foreach (var e in _original.EWords) s += "-" + e.TrimStart('-');
-        return s;
+        // Strip only existing $SA tokens. Everything else remains byte-for-byte
+        // in the same textual order.
+        var withoutSa = Regex.Replace(
+            source,
+            @"\$[A-Za-z0-9]{3,4}",
+            string.Empty,
+            RegexOptions.CultureInvariant);
+
+        var insertAt = withoutSa.Length;
+        var ho = withoutSa.IndexOf('+');
+        var ew = withoutSa.IndexOf('-');
+        if (ho >= 0) insertAt = Math.Min(insertAt, ho);
+        if (ew >= 0) insertAt = Math.Min(insertAt, ew);
+
+        var saBlock = string.Concat(_sa.Select(x => "$" + x));
+        return withoutSa.Insert(insertAt, saBlock);
     }
 }
