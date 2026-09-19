@@ -27,7 +27,7 @@ public sealed class MainActivity : Activity
     private UsbManager _usb = null!;
     private EdiabasSession _session = null!;
     private VehicleIdentityService _identity = null!;
-    private NcsSgfamParser _sgfam = null!;
+    private NcsSgfamParser _sgfam = null!;\n    private NcsAtParser _at = null!;
     private FaService _faService = null!;
     private FaultService _faults = null!;
     private BackupService _backups = null!;
@@ -536,10 +536,17 @@ public sealed class MainActivity : Activity
             lines.Add(
                 $"{vo.Source}: BR={vo.Chassis} date=#{vo.ProductionDate} type={vo.TypeCode}");
 
-            lines.Add(
-                string.Join(
-                    " ",
-                    vo.Sa.Select(x => "$" + x)));
+            foreach (var code in vo.Sa)
+            {
+                var description = _at.Describe(code)
+                    ?? OptionCatalog.Known.FirstOrDefault(
+                        x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase))?.Name;
+
+                lines.Add(
+                    string.IsNullOrWhiteSpace(description)
+                        ? "$" + code
+                        : "$" + code + " — " + description);
+            }
 
             lines.Add(string.Empty);
         }
